@@ -157,6 +157,48 @@ Queue.prototype.get = function(opts, callback) {
     })
 }
 
+Queue.prototype.update = function(payload, opts, callback) {
+    if(!payload) callback("No payload was provided DJ!")
+    var self = this
+    if ( !callback ) {
+        callback = opts
+        opts = {}
+    }
+
+    var visibility = opts.visibility || self.visibility
+    var query = {
+        deleted : null,
+        visible : { $lte : now() },
+    }
+    var sort = {
+        _id : 1
+    }
+    var update = {
+        $inc : { tries : 1 },
+        $set : {
+            ack     : id(),
+            visible : nowPlusSecs(visibility),
+            payload: payload,
+        }
+    }
+
+    self.col.findOneAndUpdate(query, update, { sort: sort, returnOriginal : false }, function(err, result) {
+        if (err) return callback(err)
+        var msg = result.value
+        if (!msg) return callback()
+
+        // convert to an external representation
+        msg = {
+            // convert '_id' to an 'id' string
+            id      : '' + msg._id,
+            ack     : msg.ack,
+            // payload : msg.payload,
+            tries   : msg.tries,
+        }
+        callback(null, msg)
+    })
+}
+
 Queue.prototype.ping = function(ack, opts, callback) {
     var self = this
     if ( !callback ) {
